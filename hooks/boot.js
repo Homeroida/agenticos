@@ -33,7 +33,12 @@ function readKernel(pluginRoot) {
 }
 
 function bootstrap(agentHome, pluginRoot) {
-  const kernel = readKernel(pluginRoot);
+  let kernel = '';
+  try {
+    kernel = readKernel(pluginRoot);
+  } catch (err) {
+    process.stderr.write(`agenticos boot: kernel unavailable (${err.message})\n`);
+  }
   let memoryIndex;
   try {
     ensureFilesystem(agentHome);

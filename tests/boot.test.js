@@ -44,3 +44,11 @@ test('bootstrap fails open when the memory home is unusable', () => {
   assert.ok(ctx.includes('AgenticOS Kernel — Core'), 'kernel must still be emitted');
   assert.ok(!ctx.includes('## Memory Index'), 'memory section must be omitted on failure');
 });
+
+test('bootstrap fails open when the kernel directory is missing', () => {
+  const home = tempHome();
+  const emptyPluginRoot = tempHome(); // has no kernel/ subdirectory
+  const ctx = bootstrap(home, emptyPluginRoot);
+  assert.ok(ctx.includes('## Memory Index'), 'memory index must still be emitted');
+  assert.ok(!ctx.includes('AgenticOS Kernel — Core'), 'kernel content must be absent');
+});
