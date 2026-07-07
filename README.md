@@ -16,11 +16,11 @@ over Claude Code so every piece of configuration has an obvious home:
 ## Install
 
 ```
-/plugin marketplace add <owner>/agenticos
+/plugin marketplace add Homeroida/agenticos
 /plugin install agenticos
 ```
 
-(replace `<owner>` with the GitHub owner or fork you're installing from)
+(installing from a fork? use that fork's owner instead of `Homeroida`)
 
 Start a new session. The boot daemon creates `~/.claude/agenticos/` and
 injects the kernel. Run `/boot` to see the status screen.
