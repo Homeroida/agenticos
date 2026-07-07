@@ -1,6 +1,6 @@
 {
   "name": "agenticos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An operating system for Claude Code: kernel rules, process subagents, daemon hooks, syscall commands, and a persistent memory filesystem.",
   "author": {
     "name": "AgenticOS contributors"

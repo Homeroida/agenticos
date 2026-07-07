@@ -27,6 +27,11 @@
 - **Syscalls** (`commands/`) — boot, ps, save, resume, review.
 - **Filesystem** (`~/.claude/agenticos/`) — `MEMORY.md` index +
   `memory/` fact files + `sessions/` snapshots and log.
+- **Monitor** (`ui/`) — the dashboard: `server.js` (127.0.0.1-only HTTP,
+  JSON API), `data.js` (fail-soft readers + button merge), `runner.js`
+  (headless `claude -p` runs, persisted to `~/.claude/agenticos/runs/`),
+  `index.html` (single self-contained page). Launched by the `/dashboard`
+  syscall.
 - **Drivers** — reserved for MCP integrations in a future version.
 
 ## Testing
