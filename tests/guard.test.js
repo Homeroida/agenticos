@@ -18,6 +18,15 @@ const DENIED = [
   'git push --force main master',
   'git push -f origin HEAD:main',
   'rm --recursive --force /',
+  'git push origin +main',
+  'git push origin +HEAD:master',
+  'git -C repo push --force origin main',
+  'git -c user.email=x push -f origin master',
+  'git -C repo reset --hard origin/main',
+  // Accepted false positive of position-independent token matching: the guard scans
+  // for `rm`/flags/root-path tokens anywhere in the string, so this harmless echo
+  // still trips the rm -rf / detector. This is current behavior, not a new rule.
+  'echo rm -rf /',
 ];
 
 const ALLOWED = [
@@ -35,6 +44,8 @@ const ALLOWED = [
   'git push --force main feature/x',
   'git push --force main',
   'rm --reference=file /',
+  'git push origin +feature/x',
+  'git -C repo push origin main',
 ];
 
 for (const cmd of DENIED) {

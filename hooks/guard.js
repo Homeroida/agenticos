@@ -24,30 +24,52 @@ function checkRmRoot(cmd) {
   return recursive && force && targets.some(isRootPath);
 }
 
+function stripForceRefspecPrefix(token) {
+  return token.startsWith('+') ? token.slice(1) : token;
+}
+
 function isProtectedRefspec(token) {
-  return (
-    token === 'main' || token === 'master' || token.endsWith(':main') || token.endsWith(':master')
-  );
+  const t = stripForceRefspecPrefix(token);
+  return t === 'main' || t === 'master' || t.endsWith(':main') || t.endsWith(':master');
+}
+
+// Starting after the `git` token, skip leading global option tokens to find
+// the subcommand (e.g. `push`, `reset`). Handles `git -C repo push ...` and
+// `git -c k=v push ...`.
+function findGitSubcommandIndex(parts, gi) {
+  let i = gi + 1;
+  while (i < parts.length && parts[i].startsWith('-')) {
+    if (parts[i] === '-C' || parts[i] === '-c') {
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  return i;
 }
 
 function checkForcePushProtected(cmd) {
   const parts = tokens(cmd);
   const gi = parts.indexOf('git');
-  if (gi === -1 || parts[gi + 1] !== 'push') return false;
-  const rest = parts.slice(gi + 2);
+  if (gi === -1) return false;
+  const si = findGitSubcommandIndex(parts, gi);
+  if (parts[si] !== 'push') return false;
+  const rest = parts.slice(si + 1);
   const force = rest.some((t) => t === '--force' || t === '-f');
-  if (!force) return false;
   const nonFlagTokens = rest.filter((t) => !t.startsWith('-'));
   // First non-flag token after `push` is the remote; refspecs follow it.
   const refspecs = nonFlagTokens.slice(1);
-  return refspecs.some(isProtectedRefspec);
+  if (force && refspecs.some(isProtectedRefspec)) return true;
+  return refspecs.some((t) => t.startsWith('+') && isProtectedRefspec(t));
 }
 
 function checkHardResetRemote(cmd) {
   const parts = tokens(cmd);
   const gi = parts.indexOf('git');
-  if (gi === -1 || parts[gi + 1] !== 'reset') return false;
-  const rest = parts.slice(gi + 2);
+  if (gi === -1) return false;
+  const si = findGitSubcommandIndex(parts, gi);
+  if (parts[si] !== 'reset') return false;
+  const rest = parts.slice(si + 1);
   return rest.includes('--hard') && rest.some((t) => t.startsWith('origin/'));
 }
 
