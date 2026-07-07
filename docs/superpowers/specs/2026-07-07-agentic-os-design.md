@@ -81,9 +81,10 @@ issues.
   index `MEMORY.md`; emits the result as additional context. This is the
   kernel delivery mechanism.
 - **guard** (`PreToolUse` on Bash) — denies a short exact-match list of
-  catastrophic commands: `rm -rf /` (and drive-root variants), force-push to
-  `main`/`master`, `git reset --hard` against a remote branch. Deny responses
-  include a one-line explanation. No fuzzy heuristics.
+  catastrophic commands: `rm -rf` targeting a filesystem root (`/`, `C:\`,
+  or another drive root), `git push --force`/`-f` to `main` or `master`, and
+  `git reset --hard` whose target is a remote-tracking ref (`origin/...`).
+  Deny responses include a one-line explanation. No fuzzy heuristics.
 - **session-log** (`SessionEnd`) — appends a session record (date, cwd,
   summary line) to `~/.claude/agenticos/sessions/` so `/resume` has data.
 
@@ -140,7 +141,9 @@ agenticos/
 
 ## Installation Story
 
-1. `/plugin marketplace add <github-user>/agenticos`
+1. `/plugin marketplace add <owner>/agenticos` (the GitHub owner is chosen
+   when the repo is published; the marketplace.json ships in-repo so any
+   fork works the same way)
 2. `/plugin install agenticos`
 3. Next session start, the boot daemon creates the filesystem and injects the
    kernel. `/boot` shows status.
