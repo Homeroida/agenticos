@@ -20,6 +20,8 @@ over Claude Code so every piece of configuration has an obvious home:
 /plugin install agenticos
 ```
 
+(replace `<owner>` with the GitHub owner or fork you're installing from)
+
 Start a new session. The boot daemon creates `~/.claude/agenticos/` and
 injects the kernel. Run `/boot` to see the status screen.
 
@@ -38,8 +40,8 @@ injects the kernel. Run `/boot` to see the status screen.
   the feature.
 - **Fail open.** A broken daemon never bricks a session: boot falls back to
   kernel-only, session-log skips silently. The guard denies only an
-  exact-match list of catastrophic commands — no fuzzy heuristics, no
-  false positives.
+  exact-match list of catastrophic commands — no fuzzy heuristics,
+  near-zero false positives.
 - **Curated, not comprehensive.** Three processes, five syscalls, three
   daemons. The kernel teaches Claude when to use each.
 

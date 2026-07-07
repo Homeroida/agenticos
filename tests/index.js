@@ -1,7 +1,7 @@
 'use strict';
 
-// Entry point for `node --test tests/` (Node on Windows needs an entry file).
-// Auto-loads every *.test.js in this directory — new test files need no registration.
+// Optional manual entry point: `node tests/index.js` runs all suites in one process.
+// `node --test tests/` discovers *.test.js files natively and does not load this file.
 
 const fs = require('node:fs');
 const path = require('node:path');
