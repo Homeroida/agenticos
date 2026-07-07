@@ -15,6 +15,9 @@ const DENIED = [
   'git push origin main --force',
   'git reset --hard origin/main',
   'git reset --hard origin/release',
+  'git push --force main master',
+  'git push -f origin HEAD:main',
+  'rm --recursive --force /',
 ];
 
 const ALLOWED = [
@@ -29,6 +32,9 @@ const ALLOWED = [
   'git reset --hard',
   'ls -la',
   '',
+  'git push --force main feature/x',
+  'git push --force main',
+  'rm --reference=file /',
 ];
 
 for (const cmd of DENIED) {

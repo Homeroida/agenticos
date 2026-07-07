@@ -16,11 +16,18 @@ function checkRmRoot(cmd) {
   const i = parts.indexOf('rm');
   if (i === -1) return false;
   const rest = parts.slice(i + 1);
-  const flags = rest.filter((t) => t.startsWith('-')).join('');
+  const shortFlags = rest.filter((t) => /^-[a-zA-Z]+$/.test(t)).join('');
   const targets = rest.filter((t) => !t.startsWith('-'));
-  const recursive = flags.includes('r') || flags.includes('R');
-  const force = flags.includes('f');
+  const recursive =
+    shortFlags.includes('r') || shortFlags.includes('R') || rest.includes('--recursive');
+  const force = shortFlags.includes('f') || rest.includes('--force');
   return recursive && force && targets.some(isRootPath);
+}
+
+function isProtectedRefspec(token) {
+  return (
+    token === 'main' || token === 'master' || token.endsWith(':main') || token.endsWith(':master')
+  );
 }
 
 function checkForcePushProtected(cmd) {
@@ -29,10 +36,11 @@ function checkForcePushProtected(cmd) {
   if (gi === -1 || parts[gi + 1] !== 'push') return false;
   const rest = parts.slice(gi + 2);
   const force = rest.some((t) => t === '--force' || t === '-f');
-  const protectedRef = rest.some(
-    (t) => t === 'main' || t === 'master' || t.endsWith(':main') || t.endsWith(':master')
-  );
-  return force && protectedRef;
+  if (!force) return false;
+  const nonFlagTokens = rest.filter((t) => !t.startsWith('-'));
+  // First non-flag token after `push` is the remote; refspecs follow it.
+  const refspecs = nonFlagTokens.slice(1);
+  return refspecs.some(isProtectedRefspec);
 }
 
 function checkHardResetRemote(cmd) {
