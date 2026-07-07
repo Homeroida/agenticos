@@ -101,7 +101,7 @@ async function refreshButtons() {
         g.buttons
           .map(
             (btn) =>
-              `<button class="launch" data-id="${esc(btn.id)}" data-input="${btn.input}" title="${esc(btn.description)}">${esc(btn.label)}</button>` +
+              `<button class="launch" data-id="${esc(btn.id)}" data-input="${esc(btn.input)}" title="${esc(btn.description)}">${esc(btn.label)}</button>` +
               (btn.input
                 ? `<span class="inputrow" data-for="${esc(btn.id)}"><input placeholder="input…"><button>Run</button></span>`
                 : '')
