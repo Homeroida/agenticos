@@ -1,2 +1,215 @@
-<h1>AgenticOS dashboard</h1>
-<p>Placeholder page — replaced in Task 4.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgenticOS</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #262b36; --text: #d7dde7;
+    --dim: #8b95a7; --accent: #5b9dd9; --ok: #4caf7d; --err: #d9695b; --warn: #d9b95b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 18px; }
+  header .dim { color: var(--dim); font-size: 12px; }
+  main { display: grid; grid-template-columns: 1fr 380px; gap: 16px; padding: 16px 24px; max-width: 1400px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 10px; }
+  .banner { background: #3a2422; border: 1px solid var(--err); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; display: none; }
+  .domain { margin-bottom: 14px; }
+  .domain h3 { font-size: 12px; color: var(--dim); margin-bottom: 8px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.launch { background: #1e2430; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; cursor: pointer; font: inherit; }
+  button.launch:hover { border-color: var(--accent); }
+  button.launch.busy { opacity: .5; cursor: wait; }
+  .inputrow { display: none; gap: 8px; margin-top: 8px; width: 100%; }
+  .inputrow input { flex: 1; background: #10141b; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font: inherit; }
+  .inputrow button { background: var(--accent); border: 0; border-radius: 6px; color: #0f1115; padding: 8px 14px; cursor: pointer; font: inherit; }
+  ul { list-style: none; }
+  li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  li:last-child { border-bottom: 0; }
+  .dim { color: var(--dim); }
+  .status-done { color: var(--ok); }
+  .status-error, .status-timeout { color: var(--err); }
+  .status-running { color: var(--warn); }
+  .run { cursor: pointer; }
+  #output { white-space: pre-wrap; background: #10141b; border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 320px; overflow: auto; font: 12px/1.5 ui-monospace, monospace; display: none; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; }
+  dt { color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>AgenticOS</h1>
+  <span class="dim" id="version"></span>
+  <span class="dim">127.0.0.1 · local only</span>
+</header>
+<main>
+  <section>
+    <div class="banner" id="banner"></div>
+    <div class="panel">
+      <h2>Launcher</h2>
+      <div id="domains"></div>
+    </div>
+    <div class="panel">
+      <h2>Run output</h2>
+      <div id="output"></div>
+      <p class="dim" id="output-hint">Click a run in the Runs panel to see its output.</p>
+    </div>
+  </section>
+  <aside>
+    <div class="panel"><h2>Status</h2><dl id="status"></dl></div>
+    <div class="panel"><h2>Runs</h2><ul id="runs"></ul></div>
+    <div class="panel"><h2>Sessions</h2><ul id="sessions"></ul></div>
+    <div class="panel"><h2>Memory</h2><ul id="memory"></ul></div>
+  </aside>
+</main>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let watching = null;
+
+async function api(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  return res.json();
+}
+
+async function refreshStatus() {
+  const s = await api('/api/status');
+  $('version').textContent = 'v' + s.version;
+  $('status').innerHTML =
+    `<dt>Kernel</dt><dd>${s.kernelModules} modules</dd>` +
+    `<dt>Daemons</dt><dd>${s.daemons.map(esc).join(', ') || '—'}</dd>` +
+    `<dt>Memory</dt><dd>${s.filesystem.memoryOk ? s.filesystem.factCount + ' facts' : 'not initialized'}</dd>` +
+    `<dt>Sessions</dt><dd>${s.filesystem.sessionCount} records</dd>`;
+}
+
+async function refreshButtons() {
+  const b = await api('/api/buttons');
+  const banner = $('banner');
+  banner.style.display = b.configError ? 'block' : 'none';
+  banner.textContent = b.configError || '';
+  $('domains').innerHTML = b.groups
+    .map(
+      (g) =>
+        `<div class="domain"><h3>${esc(g.name)}</h3><div class="grid">` +
+        g.buttons
+          .map(
+            (btn) =>
+              `<button class="launch" data-id="${esc(btn.id)}" data-input="${btn.input}" title="${esc(btn.description)}">${esc(btn.label)}</button>` +
+              (btn.input
+                ? `<span class="inputrow" data-for="${esc(btn.id)}"><input placeholder="input…"><button>Run</button></span>`
+                : '')
+          )
+          .join('') +
+        `</div></div>`
+    )
+    .join('');
+}
+
+async function refreshRuns() {
+  const runs = await api('/api/runs');
+  $('runs').innerHTML = runs
+    .map(
+      (r) =>
+        `<li class="run" data-id="${esc(r.id)}"><span class="status-${esc(r.status)}">●</span> ` +
+        `${esc(r.label)} <span class="dim">${esc(r.input)} · ${esc(r.status)} · ${esc((r.startedAt || '').slice(11, 19))}</span></li>`
+    )
+    .join('') || '<li class="dim">No runs yet.</li>';
+}
+
+async function refreshSessions() {
+  const s = await api('/api/sessions');
+  $('sessions').innerHTML =
+    s.entries
+      .slice(0, 10)
+      .map((e) => `<li>${esc((e.date || '').slice(0, 16))} <span class="dim">${esc(e.cwd || '')} · ${esc(e.reason || '')}</span></li>`)
+      .join('') +
+    s.snapshots.slice(0, 5).map((f) => `<li class="dim">📄 ${esc(f)}</li>`).join('') || '<li class="dim">No sessions yet.</li>';
+}
+
+async function refreshMemory() {
+  const facts = await api('/api/memory');
+  $('memory').innerHTML =
+    facts.map((f) => `<li title="${esc(f.file)}">${esc(f.title)} <span class="dim">${esc(f.hook)}</span></li>`).join('') ||
+    '<li class="dim">No facts yet.</li>';
+}
+
+async function startRun(id, input) {
+  const res = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ buttonId: id, input }),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    $('banner').style.display = 'block';
+    $('banner').textContent = body.error || 'run failed to start';
+    return;
+  }
+  watch(body.runId);
+  refreshRuns();
+}
+
+async function watch(runId) {
+  watching = runId;
+  $('output').style.display = 'block';
+  $('output-hint').style.display = 'none';
+  for (;;) {
+    if (watching !== runId) return;
+    const { run, output } = await api('/api/runs/' + runId);
+    $('output').textContent = `[${run.label}] ${run.status}\n\n${output}`;
+    if (run.status !== 'running') {
+      refreshRuns();
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+document.addEventListener('click', (ev) => {
+  const launch = ev.target.closest('button.launch');
+  if (launch) {
+    const id = launch.dataset.id;
+    if (launch.dataset.input === 'true') {
+      const row = document.querySelector(`.inputrow[data-for="${CSS.escape(id)}"]`);
+      row.style.display = row.style.display === 'flex' ? 'none' : 'flex';
+      row.querySelector('input').focus();
+    } else {
+      startRun(id, '');
+    }
+    return;
+  }
+  const row = ev.target.closest('.inputrow');
+  if (row && ev.target.tagName === 'BUTTON') {
+    startRun(row.dataset.for, row.querySelector('input').value);
+    return;
+  }
+  const runItem = ev.target.closest('li.run');
+  if (runItem) watch(runItem.dataset.id);
+});
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' && ev.target.matches('.inputrow input')) {
+    const row = ev.target.closest('.inputrow');
+    startRun(row.dataset.for, ev.target.value);
+  }
+});
+
+function refreshAll() {
+  refreshStatus().catch(() => {});
+  refreshRuns().catch(() => {});
+  refreshSessions().catch(() => {});
+  refreshMemory().catch(() => {});
+}
+refreshButtons().catch(() => {});
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
