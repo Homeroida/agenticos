@@ -24,6 +24,7 @@ class Runner {
     this.killGraceMs = opts.killGraceMs || DEFAULT_KILL_GRACE_MS;
     this.active = new Map(); // id -> child process
     this.records = new Map(); // id -> record (this process's runs)
+    this.timedOut = new Set(); // ids whose timeout timer has fired
   }
 
   runsDir() {
@@ -61,7 +62,12 @@ class Runner {
     child.stdout.pipe(out, { end: false });
     child.stderr.pipe(out, { end: false });
     const timer = setTimeout(() => {
-      record.status = 'timeout';
+      // Do NOT touch record.status here: the invariant is that record.status
+      // only flips to a terminal value inside finish()'s out.end callback,
+      // after the output file has flushed. Recording the timeout separately
+      // lets the close handler decide the final status once the child has
+      // actually exited and output has been captured.
+      this.timedOut.add(id);
       child.kill('SIGTERM');
       const hardKill = setTimeout(() => {
         if (this.active.has(id)) child.kill('SIGKILL');
@@ -77,7 +83,8 @@ class Runner {
     child.on('close', (code) => {
       clearTimeout(timer);
       this.active.delete(id);
-      const status = record.status === 'timeout' ? 'timeout' : code === 0 ? 'done' : 'error';
+      const status = this.timedOut.has(id) ? 'timeout' : code === 0 ? 'done' : 'error';
+      this.timedOut.delete(id);
       this.finish(record, status, code, out, null);
     });
     return { id };
@@ -95,6 +102,7 @@ class Runner {
       try {
         fs.appendFileSync(path.join(this.runsDir(), 'log.jsonl'), JSON.stringify(record) + '\n');
       } catch {}
+      this.records.delete(record.id);
     });
   }
 

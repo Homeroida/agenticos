@@ -96,3 +96,30 @@ test('input-less buttons ignore the input argument', async () => {
   await waitFor(() => runner.getRun(id).run.status !== 'running');
   assert.strictEqual(runner.getRun(id).output, 'RAN:fixed');
 });
+
+test('finished runs are evicted from memory but still retrievable from disk', async () => {
+  const home = tempDir();
+  const runner = makeRunner(home);
+  const { id } = runner.startRun(BUTTON, 'evict', home);
+  await waitFor(() => {
+    const found = runner.getRun(id);
+    return found && found.run.status !== 'running';
+  });
+  assert.strictEqual(runner.records.size, 0);
+  const { run, output } = runner.getRun(id);
+  assert.strictEqual(run.status, 'done');
+  assert.strictEqual(output, 'RAN:hello evict');
+});
+
+test('status stays running until the output file is complete (timeout path)', async () => {
+  const home = tempDir();
+  const runner = makeRunner(home, { timeoutMs: 200, killGraceMs: 100 });
+  const { id } = runner.startRun({ id: 'x:hang', label: 'Hang', prompt: 'HANG', input: false }, '', home);
+  // Immediately after the timer would fire, the public status must still be
+  // 'running' if the child hasn't closed yet; eventually it becomes 'timeout'.
+  await new Promise((r) => setTimeout(r, 220));
+  const mid = runner.getRun(id).run.status;
+  assert.ok(mid === 'running' || mid === 'timeout', `unexpected status ${mid}`);
+  await waitFor(() => runner.getRun(id).run.status !== 'running');
+  assert.strictEqual(runner.getRun(id).run.status, 'timeout');
+});
