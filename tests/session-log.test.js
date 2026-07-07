@@ -25,8 +25,24 @@ test('logSession appends a JSON line, creating sessions/ if needed', () => {
 
 test('script exits 0 even on malformed stdin', () => {
   const { execFileSync } = require('node:child_process');
-  // Throws on non-zero exit; passing means fail-open works.
+  const home = tempHome();
   execFileSync(process.execPath, [path.resolve(__dirname, '..', 'hooks', 'session-log.js')], {
     input: 'not json',
+    env: { ...process.env, HOME: home, USERPROFILE: home },
   });
+});
+
+test('script logs a well-formed payload into the overridden home, not the real one', () => {
+  const { execFileSync } = require('node:child_process');
+  const home = tempHome();
+  execFileSync(process.execPath, [path.resolve(__dirname, '..', 'hooks', 'session-log.js')], {
+    input: JSON.stringify({ session_id: 'iso-test', cwd: '/tmp/x', reason: 'exit' }),
+    env: { ...process.env, HOME: home, USERPROFILE: home },
+  });
+  const logPath = path.join(home, '.claude', 'agenticos', 'sessions', 'log.jsonl');
+  const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
+  assert.strictEqual(lines.length, 1);
+  const record = JSON.parse(lines[0]);
+  assert.strictEqual(record.session_id, 'iso-test');
+  assert.ok(record.date.includes('T'), 'date must be ISO format');
 });
