@@ -1,0 +1,13 @@
+{
+  "name": "agenticos",
+  "owner": {
+    "name": "AgenticOS contributors"
+  },
+  "plugins": [
+    {
+      "name": "agenticos",
+      "source": "./",
+      "description": "An operating system for Claude Code: kernel rules, process subagents, daemon hooks, syscall commands, and a persistent memory filesystem."
+    }
+  ]
+}
