@@ -78,6 +78,7 @@ class Runner {
     child.on('error', (err) => {
       clearTimeout(timer);
       this.active.delete(id);
+      this.timedOut.delete(id);
       this.finish(record, 'error', null, out, `spawn failed: ${err.message}. Set AGENTICOS_CLAUDE_BIN to the full path of your claude binary.`);
     });
     child.on('close', (code) => {

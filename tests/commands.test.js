@@ -7,7 +7,7 @@ const path = require('node:path');
 const COMMANDS_DIR = path.resolve(__dirname, '..', 'commands');
 const EXPECTED = ['boot.md', 'ps.md', 'save.md', 'resume.md', 'review.md', 'dashboard.md'];
 
-test('syscall table contains exactly the five commands', () => {
+test('syscall table contains exactly the six commands', () => {
   const files = fs.readdirSync(COMMANDS_DIR).filter((f) => f.endsWith('.md')).sort();
   assert.deepStrictEqual(files, [...EXPECTED].sort());
 });
