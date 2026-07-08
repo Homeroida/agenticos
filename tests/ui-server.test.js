@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { createServer } = require('../ui/server.js');
@@ -70,6 +71,59 @@ test('server serves the page, all GET endpoints, and executes a run end-to-end',
 
     const runsList = await (await fetch(`${base}/api/runs`)).json();
     assert.ok(runsList.some((r) => r.id === runId));
+  } finally {
+    server.close();
+  }
+});
+
+function requestWithHost(port, hostHeader, pathname) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: pathname,
+        method: 'GET',
+        headers: { host: hostHeader },
+      },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      }
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('server rejects cross-origin and malformed requests', async () => {
+  const home = tempDir();
+  const runner = new Runner({ agentHome: home, bin: process.execPath, binArgs: [FAKE] });
+  const server = createServer({ agentHome: home, pluginRoot: PLUGIN_ROOT, runner });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    // DNS-rebinding shape: wrong Host header
+    const reboundStatus = await requestWithHost(port, 'evil.example.com', '/api/status');
+    assert.strictEqual(reboundStatus, 403);
+    // CSRF shape: cross-site Origin on a no-preflight POST
+    const csrf = await fetch(`${base}/api/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain', origin: 'https://evil.example.com' },
+      body: JSON.stringify({ buttonId: 'example:deep-research', input: 'x' }),
+    });
+    assert.strictEqual(csrf.status, 403);
+    // Same-origin POSTs still work
+    const ok = await fetch(`${base}/api/run`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: `http://127.0.0.1:${port}` },
+      body: JSON.stringify({ buttonId: 'example:deep-research', input: 'ok' }),
+    });
+    assert.strictEqual(ok.status, 200);
+    // JSON null body → clean 400, not 500
+    const nullBody = await fetch(`${base}/api/run`, { method: 'POST', body: 'null' });
+    assert.strictEqual(nullBody.status, 400);
   } finally {
     server.close();
   }

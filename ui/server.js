@@ -22,17 +22,41 @@ function json(res, code, body) {
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let body = '';
+    const chunks = [];
+    let total = 0;
     req.on('data', (chunk) => {
-      body += chunk;
-      if (body.length > MAX_BODY_BYTES) {
+      total += chunk.length;
+      if (total > MAX_BODY_BYTES) {
         reject(new Error('body too large'));
         req.destroy();
+        return;
       }
+      chunks.push(chunk);
     });
-    req.on('end', () => resolve(body));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
+}
+
+function isAllowedRequest(req) {
+  const port = req.socket.localPort;
+  const allowedHosts = new Set([
+    `127.0.0.1:${port}`,
+    `localhost:${port}`,
+    '127.0.0.1',
+    'localhost',
+  ]);
+  if (!allowedHosts.has(String(req.headers.host || '').toLowerCase())) return false;
+  const origin = req.headers.origin;
+  if (origin !== undefined) {
+    const allowedOrigins = new Set([
+      `http://127.0.0.1:${port}`,
+      `http://localhost:${port}`,
+      'null', // some browsers send literal "null" for local files; still local
+    ]);
+    if (!allowedOrigins.has(String(origin).toLowerCase())) return false;
+  }
+  return true;
 }
 
 function createServer(opts = {}) {
@@ -41,6 +65,9 @@ function createServer(opts = {}) {
   const runner = opts.runner || new Runner({ agentHome });
 
   async function route(req, res) {
+    if (!isAllowedRequest(req)) {
+      return json(res, 403, { error: 'forbidden: cross-origin request' });
+    }
     const pathname = new URL(req.url, `http://${HOST}`).pathname;
     if (req.method === 'GET' && pathname === '/') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -74,6 +101,9 @@ function createServer(opts = {}) {
       } catch {
         return json(res, 400, { error: 'invalid JSON body' });
       }
+      if (typeof payload !== 'object' || payload === null) {
+        return json(res, 400, { error: 'invalid JSON body' });
+      }
       const buttons = data.readButtons(agentHome, pluginRoot);
       const button = data.findButton(buttons, String(payload.buttonId || ''));
       if (!button) return json(res, 400, { error: 'unknown buttonId' });
@@ -89,7 +119,10 @@ function createServer(opts = {}) {
   return http.createServer((req, res) => {
     Promise.resolve()
       .then(() => route(req, res))
-      .catch((err) => json(res, 500, { error: err.message }));
+      .catch((err) => {
+        process.stderr.write(`agenticos dashboard: ${err && err.stack ? err.stack : err}\n`);
+        json(res, 500, { error: 'internal error' });
+      });
   });
 }
 
